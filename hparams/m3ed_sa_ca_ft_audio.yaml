@@ -1,0 +1,74 @@
+# SpeechBrain hyperparameters for M³ED dataset
+# Best configuration: SA+CA with fine-tuned audio encoder
+#
+# Usage: python train.py hparams/m3ed_sa_ca_ft_audio.yaml
+
+seed: 1993
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+
+# Dataset configuration
+dataset_name: m3ed
+m3ed_feature_pickle: data/m3ed/m3ed_features.pkl
+
+# Output directory
+output_folder: results/m3ed_sb
+save_folder: !ref <output_folder>/save
+train_log: !ref <output_folder>/train_log.txt
+
+# Train logger
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <train_log>
+
+# Training parameters
+number_of_epochs: 30
+batch_size: 1
+lr: 1.0e-4
+pretrained_lr: 1.0e-5
+weight_decay: 0.0
+
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <number_of_epochs>
+
+# Model configuration
+# input_dims: Dimensions from the pre-packaged pickle features.
+# These values are fixed and should NOT be modified.
+# When using dynamic encoders, the code automatically detects encoder output dimensions.
+mm_model: !new:model.UnifiedEmotionModel
+    input_dims: [1024, 1024, 342]  # [text, audio, vision] - fixed from pickle
+    modalities: ["text", "audio", "vision"]
+    use_cross_attn: true
+    use_self_attn: true
+    causal_self_attn: false
+    fusion_arch: transformer
+    fusion_depth: 1
+    fusion_d_ff: 1024
+    fusion_dropout: 0.1
+    d_model: 256
+    n_heads: 8
+    num_classes: 7
+    dynamic_text: true
+    dynamic_audio: true
+    finetune_text: false
+    finetune_audio: true
+    text_model_path: Johnson8187/Chinese-Emotion
+    audio_model_path: TencentGameMate/chinese-hubert-large
+
+modules:
+    mm_model: !ref <mm_model>
+
+log_softmax: !new:speechbrain.nnet.activations.Softmax
+    apply_log: true
+
+compute_cost: !name:speechbrain.nnet.losses.nll_loss
+
+error_stats: !name:speechbrain.utils.metric_stats.MetricStats
+    metric: !name:speechbrain.nnet.losses.classification_error
+        reduction: batch
+
+opt_class: !name:torch.optim.Adam
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <save_folder>
+    recoverables:
+        model: !ref <mm_model>
+        counter: !ref <epoch_counter>

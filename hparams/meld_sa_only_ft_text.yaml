@@ -1,0 +1,76 @@
+# SpeechBrain hyperparameters for MELD dataset
+# Best configuration: SA-only with fine-tuned text encoder
+#
+# Usage: python train.py hparams/meld_sa_only_ft_text.yaml
+
+seed: 1993
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+
+# Dataset configuration
+dataset_name: meld
+meld_base_dir: /path/to/meld  # Update this path
+
+# Output directory
+output_folder: results/meld_sb
+save_folder: !ref <output_folder>/save
+train_log: !ref <output_folder>/train_log.txt
+
+# Train logger
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <train_log>
+
+# Training parameters
+number_of_epochs: 30
+batch_size: 1
+lr: 1.0e-4
+pretrained_lr: 1.0e-5
+weight_decay: 1.0e-8
+
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <number_of_epochs>
+
+# Model configuration
+# input_dims: For MELD, only vision_dim (2048) is used from this config.
+# The first two values (text, audio) are ignored because dynamic encoding is required.
+# Dynamic encoders auto-detect their output dimensions.
+mm_model: !new:model.UnifiedEmotionModel
+    input_dims: [768, 768, 2048]  # [text (ignored), audio (ignored), vision]
+    modalities: ["text", "audio", "vision"]
+    use_cross_attn: false  # SA-only is best for MELD
+    use_self_attn: true
+    causal_self_attn: false
+    fusion_arch: transformer
+    fusion_depth: 1
+    fusion_d_ff: 1024
+    fusion_dropout: 0.1
+    d_model: 256
+    n_heads: 8
+    num_classes: 7
+    # Dynamic encoding (MELD requires dynamic encoding - do NOT set to false)
+    # The pickle files only contain vision features; text/audio are encoded on-the-fly
+    dynamic_text: true   # Must be true for MELD
+    dynamic_audio: true  # Must be true for MELD
+    finetune_text: true
+    finetune_audio: false
+    text_model_path: FacebookAI/roberta-base
+    audio_model_path: facebook/wav2vec2-base
+
+modules:
+    mm_model: !ref <mm_model>
+
+log_softmax: !new:speechbrain.nnet.activations.Softmax
+    apply_log: true
+
+compute_cost: !name:speechbrain.nnet.losses.nll_loss
+
+error_stats: !name:speechbrain.utils.metric_stats.MetricStats
+    metric: !name:speechbrain.nnet.losses.classification_error
+        reduction: batch
+
+opt_class: !name:torch.optim.Adam
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <save_folder>
+    recoverables:
+        model: !ref <mm_model>
+        counter: !ref <epoch_counter>

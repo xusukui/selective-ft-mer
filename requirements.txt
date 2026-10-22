@@ -1,0 +1,13 @@
+# Versions checked on Linux with Python 3.12.
+speechbrain==1.0.3
+torch==2.7.1
+torchaudio==2.7.1
+transformers==4.57.1
+numpy==2.1.2
+pandas==2.3.3
+scikit-learn==1.7.2
+tqdm==4.67.1
+soundfile==0.13.1
+hyperpyyaml==1.2.2
+sentencepiece==0.2.1
+PyYAML==6.0.3
